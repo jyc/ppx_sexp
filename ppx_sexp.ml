@@ -14,6 +14,7 @@ type sexp = [
   | `String of string
   | `List of sexp list
 
+  (* These last two types are not present in generated code. *)
   | `Expr of Parsetree.structure
   | `Error of Location.t * string
 ]

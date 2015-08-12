@@ -1,2 +1,6 @@
 version = "0.1"
+
+archive(byte) = "ppxSexp.cma"
+archive(native) = "ppxSexp.cmxa"
+
 ppx = "./ppx_sexp.native"

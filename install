@@ -10,4 +10,9 @@ fi
 
 ocamlbuild -package compiler-libs.common ppx_sexp.native
 
-ocamlfind install $PKGNAME META _build/ppx_sexp.native
+ocamlbuild ppxSexp.cma
+ocamlbuild ppxSexp.cmxa
+
+ocamlfind install $PKGNAME META \
+    _build/ppx_sexp.native \
+    _build/*.cmi _build/*.cma _build/*.cmxa _build/*.mli _build/*.ml

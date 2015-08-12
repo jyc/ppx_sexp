@@ -81,3 +81,8 @@ HTML documents do not often include `let` or `/` tags, so ppx_sexp works well en
 
 You can use the included `./install` script to install ppx_sexp using ocamlfind.
 `./uninstall` will uninstall ppx_sexp similarly.
+
+# Type of Generated S-expressions
+
+Generated S-expressions have the type `PpxSexp.sexp`.
+`PpxSexp` is a module and interface containing only that type installed by `./install`.
