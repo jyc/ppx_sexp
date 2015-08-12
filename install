@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e
+
+PKGNAME=ppx_sexp
+
+if [[ -z $(ocamlfind query $PKGNAME 2>&1 | grep "not found") ]]; then
+    ocamlfind remove $PKGNAME
+fi
+
+ocamlbuild -package compiler-libs.common ppx_sexp.native
+
+ocamlfind install $PKGNAME META _build/ppx_sexp.native

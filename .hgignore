@@ -1,0 +1,5 @@
+syntax: glob
+
+_build/*
+ppx_sexp.native
+ppx_sexp.cmt
