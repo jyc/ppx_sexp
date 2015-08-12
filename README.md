@@ -30,7 +30,7 @@ Whereas in Scheme you could write a HTML document that shows a user's name like 
         (p "Great to see you.")))
 
 In OCaml you end up with a lot more noise, because there is no way to enter a mode in which 'symbols' are quoted by default.
-Here we use a `\`Y` variant to identify symbols, an `\`S` variant to identify strings, and an `\`L` variant to identify lists:
+Here we use a `Y` variant to identify symbols, an `S` variant to identify strings, and an `L` variant to identify lists:
 
     [`Y "html"; `L [`Y "@"; `L [`Y "lang"; `S "en"]];
      `L [`Y "head";
