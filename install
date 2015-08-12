@@ -15,4 +15,4 @@ ocamlbuild ppxSexp.cmxa
 
 ocamlfind install $PKGNAME META \
     _build/ppx_sexp.native \
-    _build/*.cmi _build/*.cma _build/*.cmxa _build/*.mli _build/*.ml
+    _build/*.cmi _build/*.cma _build/*.cmxa _build/*.mli _build/*.ml _build/*.a
