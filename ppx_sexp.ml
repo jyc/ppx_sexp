@@ -10,8 +10,9 @@ type sexp = [
   | `Int of int
   | `Int32 of int32
   | `Int64 of int64
-  | `NativeInt of nativeint
+  | `Nativeint of nativeint
   | `String of string
+  | `Bool of bool
   | `List of sexp list
 
   (* These last two types are not present in generated code. *)
@@ -79,7 +80,7 @@ and quote ({ pexp_desc; pexp_loc } as x) =
       | Const_float x -> `Float x
       | Const_int32 x -> `Int32 x
       | Const_int64 x -> `Int64 x
-      | Const_nativeint x -> `NativeInt x
+      | Const_nativeint x -> `Nativeint x
     end
   | Pexp_apply (x, args) ->
     `List (quote x :: quote_args' args)
@@ -89,6 +90,10 @@ and quote ({ pexp_desc; pexp_loc } as x) =
     begin match id, x' with
       | Longident.Lident "::", Some _ ->
         quote_list x
+      | Longident.Lident "true", Some _ ->
+        `Bool true
+      | Longident.Lident "false", Some _ ->
+        `Bool false
       | _, Some x ->
         `List [quote_id id; quote x]
       | _, None ->
@@ -136,13 +141,14 @@ and quote ({ pexp_desc; pexp_loc } as x) =
     `Error (pexp_loc, "OCaml keywords cannot be quoted.")
 
 let rec encode s = 
+  let expr x =
+    { pexp_desc = x; pexp_loc = Location.none; pexp_attributes = [] } in
+  let constr ?args x = 
+    expr (Pexp_construct ({ txt = Longident.Lident x; loc = Location.none }, args)) in
   let encode' v d =
-    { pexp_desc = Pexp_variant (v, Some { pexp_desc = d;
-                                          pexp_loc = Location.none;
-                                          pexp_attributes = [] });
-      pexp_loc = Location.none;
-      pexp_attributes = [] } 
-  in
+    expr (Pexp_variant (v, Some { pexp_desc = d;
+                                 pexp_loc = Location.none;
+                                 pexp_attributes = [] })) in
   let const v c = encode' v (Pexp_constant c) in
   match s with
   | `Char x ->
@@ -157,26 +163,21 @@ let rec encode s =
     const "Int32" (Const_int32 x)
   | `Int64 x ->
     const "Int64" (Const_int64 x)
-  | `NativeInt x ->
-    const "NativeInt" (Const_nativeint x)
+  | `Nativeint x ->
+    const "Nativeint" (Const_nativeint x)
   | `String x ->
     const "String" (Const_string (x, None))
+  | `Bool true ->
+    constr "true"
+  | `Bool false ->
+    constr "false"
   | `List xs ->
-    let nil = { pexp_desc = Pexp_construct ({ txt = Longident.Lident "[]";
-                                              loc = Location.none }, None);
-                pexp_loc = Location.none;
-                pexp_attributes = [] } in
+    let nil = constr "[]" in
     let cons a b =
-      { pexp_desc = Pexp_construct ({ txt = Longident.Lident "::";
-                                      loc = Location.none },
-                                    Some ({ pexp_desc = Pexp_tuple [a; b];
-                                            pexp_loc = Location.none;
-                                            pexp_attributes = [] }));
-        pexp_loc = Location.none;
-        pexp_attributes = [] } in
-    { pexp_desc = Pexp_variant ("List", Some (List.fold_right cons (List.map encode xs) nil));
-      pexp_loc = Location.none;
-      pexp_attributes = [] }
+      constr "::" ~args:{ pexp_desc = Pexp_tuple [a; b];
+                          pexp_loc = Location.none;
+                          pexp_attributes = [] } in
+    expr (Pexp_variant ("List", Some (List.fold_right cons (List.map encode xs) nil)))
   | `Expr x -> x
   | `Error (loc, msg) -> error loc msg
 

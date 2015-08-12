@@ -5,7 +5,8 @@ type sexp = [
   | `Int of int
   | `Int32 of int32
   | `Int64 of int64
-  | `NativeInt of nativeint
+  | `Nativeint of nativeint
   | `String of string
+  | `Bool of bool
   | `List of sexp list
 ]
