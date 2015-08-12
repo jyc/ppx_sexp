@@ -10,6 +10,24 @@ is translated into:
 
     `List [`Symbol "define"; `Symbol "a"; `String "hi there"]
 
+You can unquote, or insert regular OCaml expressions inside of the S-expression that will be evaluated instead of converted to atoms (e.g. `List`, `Symbol`) using the `[%in ...]` syntax:
+
+    let a = [%sexp (title "Hello, world!")] in
+    [%sexp (html
+              (head
+                 [%in a])
+              (body
+                 (p "Hi there!")))]
+
+When inserting values, you must make sure to contain them in the appropriate polymorphic variant (the names correspond directly to OCaml's AST constant types, with the exception of Bool):
+
+     [%sexp (print [%in `String "S-expressions: abbreviated sexp"])]
+
+The `%in` syntax is intended to be used for embedding other S-expressions. 
+If you are embedding atoms, there is a streamlined syntax:
+
+     [%sexp (print [%string "S-expressions: sexp"])]
+
 # Why is this useful?
 
 Well, Scheme has a very cool set of specifications and tooling called [SXML](https://en.wikipedia.org/wiki/SXML) that lets you write XML documents using S-expressions.

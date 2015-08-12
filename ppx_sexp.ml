@@ -16,9 +16,25 @@ type sexp = [
   | `List of sexp list
 
   (* These last two types are not present in generated code. *)
-  | `Expr of Parsetree.structure
+  | `Expr of string * Parsetree.structure
   | `Error of Location.t * string
 ]
+
+let atom_constr_of_alias, is_alias =
+  let h = Hashtbl.create 1 in
+  let () = begin
+    Hashtbl.add h "char" "Char" ;
+    Hashtbl.add h "float" "Float" ;
+    Hashtbl.add h "symbol" "Symbol" ;
+    Hashtbl.add h "int" "Int" ;
+    Hashtbl.add h "int32" "Int32" ;
+    Hashtbl.add h "int64" "Int64" ;
+    Hashtbl.add h "nativeint" "Nativeint" ;
+    Hashtbl.add h "string" "String" ;
+    Hashtbl.add h "bool" "Bool" ;
+    Hashtbl.add h "list" "List" ;
+  end in
+  Hashtbl.find h, Hashtbl.mem h
 
 let string_of_id id =
   Longident.flatten id
@@ -123,11 +139,11 @@ and quote ({ pexp_desc; pexp_loc } as x) =
     `List (List.map quote xs)
   (* We could support these, but it's not clear whether users would use these for their s-expressions. *)
   | Pexp_sequence _ -> failwith "Sequenced expressions cannot be quoted."
-  | Pexp_extension ({ txt = "in" }, PStr ss) ->
+  | Pexp_extension ({ txt }, PStr ss) when txt = "in" || is_alias txt ->
     begin match ss with
       | { pstr_desc = Pstr_eval (x, _) } :: [] ->
-        `Expr x
-      | _ -> `Error (pexp_loc, "Invalid body of [%in ...]: must only contain one structure element.")
+        `Expr (txt, x)
+      | _ -> `Error (pexp_loc, "Invalid body of insertion: must only contain one structure element.")
     end
   (* We could try to quote these, e.g. let x = 5, but the client would still be
      constrained to only use these OCaml keywords in a way that would be valid
@@ -147,8 +163,8 @@ let rec encode s =
     expr (Pexp_construct ({ txt = Longident.Lident x; loc = Location.none }, args)) in
   let encode' v d =
     expr (Pexp_variant (v, Some { pexp_desc = d;
-                                 pexp_loc = Location.none;
-                                 pexp_attributes = [] })) in
+                                  pexp_loc = Location.none;
+                                  pexp_attributes = [] })) in
   let const v c = encode' v (Pexp_constant c) in
   match s with
   | `Char x ->
@@ -178,7 +194,9 @@ let rec encode s =
                           pexp_loc = Location.none;
                           pexp_attributes = [] } in
     expr (Pexp_variant ("List", Some (List.fold_right cons (List.map encode xs) nil)))
-  | `Expr x -> x
+  | `Expr ("in", x) -> x
+  | `Expr (alias, x) ->
+    expr (Pexp_variant (atom_constr_of_alias alias, Some x))
   | `Error (loc, msg) -> error loc msg
 
 let sexp_mapper argv =
