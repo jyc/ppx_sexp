@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+ocamlbuild -package compiler-libs.common ppx_sexp.native
+
+ocamlbuild ppxSexp.cma
+ocamlbuild ppxSexp.cmxa
