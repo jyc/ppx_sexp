@@ -52,7 +52,8 @@ With the ppx_sexp syntax extension, we can regain much of the expressiveness of 
              (p "Great to see you.")))]
 
 Note that `[%in name]` is used to unquote the `name` variable.
-To be properly typed, it would have to be of the form `\`String "Some Name"`.
+To be properly typed, it would have to be of the form `String "Some Name"`.
+(The `String` constructor should be that of the polymorphic variant, not the normal variant -- Markdown formatting is messing with displaying the backtick. Sorry.)
 
 # Limitations
 
