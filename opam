@@ -1,6 +1,6 @@
 opam-version: "1.2"
 name: "ppx_sexp"
-version: "0.2.0"
+version: "0.2.2"
 maintainer: "Jonathan Chan <jyc@fastmail.fm>"
 authors: "Jonathan Chan <jyc@fastmail.fm>"
 homepage: "https://bitbucket.org/jyc/ppx_sexp"
@@ -15,3 +15,4 @@ remove: ["./uninstall"]
 depends: [
   "ocamlfind" {build}
 ]
+available: [ (ocaml-version >= "4.02.0") & (ocaml-version < "4.03.0") ]
