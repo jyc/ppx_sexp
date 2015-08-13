@@ -4,7 +4,7 @@ version: "0.2.2"
 maintainer: "Jonathan Chan <jyc@fastmail.fm>"
 authors: "Jonathan Chan <jyc@fastmail.fm>"
 homepage: "https://bitbucket.org/jyc/ppx_sexp"
-bug-reports: "https://bitbucket.org/jyc/ppx_sexp/issues?status=new&status=open"
+bug-reports: "https://bitbucket.org/jyc/ppx_sexp/issues"
 license: "BSD 2-Clause"
 dev-repo: "https://bitbucket.org/jyc/ppx_sexp/src"
 build: [
