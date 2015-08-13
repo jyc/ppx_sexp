@@ -40,9 +40,16 @@ let string_of_id id =
   Longident.flatten id
   |> String.concat "."
 
-let rec quote_id id =
-  string_of_id id
-  |> fun x -> `Symbol x
+let quote_id ?fudge id =
+  let s = string_of_id id in
+  `Symbol (
+    match fudge with
+    | None -> s
+    | Some c ->
+      if s.[String.length s - 1] = c then
+        String.sub s 0 (String.length s - 1)
+      else s
+  )
 
 let error loc msg =
   { pexp_desc =
@@ -60,15 +67,15 @@ let error loc msg =
 (** quote_args' returns an alist in sexp form of the arguments in an
     application, given an AST subtree. Note that the result is not wrapped
     in an sexp. *)
-let rec quote_args' args =
+let rec quote_args' ?fudge args =
   (List.fold_right
     (fun (l, x) a ->
        match l with
-       | "" -> quote x :: a
-       | s -> `List [`Symbol s; quote x] :: a)
+       | "" -> quote ?fudge x :: a
+       | s -> `List [`Symbol s; quote ?fudge x] :: a)
     args [])
 
-and quote_list x =
+and quote_list ?fudge x =
   let rec quote_list' { pexp_desc } =
     match pexp_desc with
     | Pexp_construct ({ txt = Longident.Lident "::" }, Some { pexp_desc = Pexp_tuple xs }) ->
@@ -80,12 +87,13 @@ and quote_list x =
     | Pexp_construct ({ txt = Longident.Lident "[]" }, None) ->
       []
     | _ -> invalid_arg "Not a list."
-  in `List (List.map quote (quote_list' x))
+  in `List (List.map (quote ?fudge) (quote_list' x))
 
-and quote ({ pexp_desc; pexp_loc } as x) =
+and quote ?fudge ({ pexp_desc; pexp_loc } as x) =
+  let quote' = quote ?fudge in
   match pexp_desc with
   | Pexp_ident { txt = id } ->
-    quote_id id
+    quote_id ?fudge id
   | Pexp_constant const ->
     begin match const with
       | Const_int x -> `Int x
@@ -99,26 +107,26 @@ and quote ({ pexp_desc; pexp_loc } as x) =
       | Const_nativeint x -> `Nativeint x
     end
   | Pexp_apply (x, args) ->
-    `List (quote x :: quote_args' args)
+    `List (quote' x :: quote_args' ?fudge args)
   | Pexp_tuple xs ->
-    `List (List.map quote xs)
+    `List (List.map quote' xs)
   | Pexp_construct ({ txt = id }, x') ->
     begin match id, x' with
       | Longident.Lident "::", Some _ ->
-        quote_list x
+        quote_list ?fudge x
       | Longident.Lident "true", Some _ ->
         `Bool true
       | Longident.Lident "false", Some _ ->
         `Bool false
       | _, Some x ->
-        `List [quote_id id; quote x]
+        `List [quote_id id; quote' x]
       | _, None ->
         quote_id id
     end
   | Pexp_variant (l, x') ->
     begin match x' with
     | Some x ->
-      `List [`String l; quote x]
+      `List [`String l; quote' x]
     | None ->
       `String l
     end
@@ -127,16 +135,16 @@ and quote ({ pexp_desc; pexp_loc } as x) =
     begin match from with
     | Some _ -> `Error (pexp_loc, "Records creations using 'with' cannot be quoted.")
     | None ->
-      `List (List.map (fun ({ txt = id }, x) -> `List [quote_id id; quote x]) sets)
+      `List (List.map (fun ({ txt = id }, x) -> `List [quote_id ?fudge id; quote' x]) sets)
     end
   | Pexp_field (x, { txt = id }) ->
-    begin match quote x with
+    begin match quote' x with
       | `Symbol s -> `Symbol (s ^ "." ^ string_of_id id)
       | _ -> `Error (pexp_loc, "Field assignments accessing objects not identified by simple identifiers cannot be quoted.")
     end
   | Pexp_setfield _ -> `Error (pexp_loc, "Field assignments cannot be quoted.")
   | Pexp_array xs ->
-    `List (List.map quote xs)
+    `List (List.map quote' xs)
   (* We could support these, but it's not clear whether users would use these for their s-expressions. *)
   | Pexp_sequence _ -> failwith "Sequenced expressions cannot be quoted."
   | Pexp_extension ({ txt }, PStr ss) when txt = "in" || is_alias txt ->
@@ -205,8 +213,18 @@ let sexp_mapper argv =
       match expr with
       | { pexp_desc = Pexp_extension ({ txt = "sexp" }, PStr ss) } ->
         begin match ss with
-          | { pstr_desc = Pstr_eval (expr, _) } :: []->
+          | { pstr_desc = Pstr_eval (expr, _) } :: [] ->
             encode mapper (quote expr)
+          | _ -> failwith "The extension payload must contain only one s-expression."
+        end
+      | { pexp_desc = Pexp_extension ({ txt = "sfxp" }, PStr ss) } ->
+        begin match ss with
+          | { pstr_desc = Pstr_eval (expr, _) } :: [] ->
+            begin match expr with
+              | { pexp_desc = Pexp_tuple [{ pexp_desc = Pexp_constant (Const_char c) }; x] } ->
+                encode mapper (quote ~fudge:c x)
+              | _ -> failwith "Expected an application of the form [%sxfp fudge_char, expr]."
+            end
           | _ -> failwith "The extension payload must contain only one s-expression."
         end
       | other -> default_mapper.expr mapper other }
