@@ -156,7 +156,7 @@ and quote ({ pexp_desc; pexp_loc } as x) =
   | Pexp_extension _ ->
     `Error (pexp_loc, "OCaml keywords cannot be quoted.")
 
-let rec encode s = 
+let rec encode mapper s = 
   let expr x =
     { pexp_desc = x; pexp_loc = Location.none; pexp_attributes = [] } in
   let constr ?args x = 
@@ -193,10 +193,10 @@ let rec encode s =
       constr "::" ~args:{ pexp_desc = Pexp_tuple [a; b];
                           pexp_loc = Location.none;
                           pexp_attributes = [] } in
-    expr (Pexp_variant ("List", Some (List.fold_right cons (List.map encode xs) nil)))
-  | `Expr ("in", x) -> x
+    expr (Pexp_variant ("List", Some (List.fold_right cons (List.map (encode mapper) xs) nil)))
+  | `Expr ("in", x) -> (mapper.expr mapper x)
   | `Expr (alias, x) ->
-    expr (Pexp_variant (atom_constr_of_alias alias, Some x))
+    expr (Pexp_variant (atom_constr_of_alias alias, Some (mapper.expr mapper x)))
   | `Error (loc, msg) -> error loc msg
 
 let sexp_mapper argv =
@@ -206,7 +206,7 @@ let sexp_mapper argv =
       | { pexp_desc = Pexp_extension ({ txt = "sexp" }, PStr ss) } ->
         begin match ss with
           | { pstr_desc = Pstr_eval (expr, _) } :: []->
-            encode (quote expr)
+            encode mapper (quote expr)
           | _ -> failwith "The extension payload must contain only one s-expression."
         end
       | other -> default_mapper.expr mapper other }
