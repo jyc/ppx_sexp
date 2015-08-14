@@ -28,6 +28,17 @@ If you are embedding atoms, there is a streamlined syntax:
 
      [%sexp (print [%string "S-expressions: sexp"])]
 
+If you have an S-expression list that you'd like to splice, there is the `[%sp ...]` syntax:
+
+    let x = [%sexp (b c d)] in
+    [%sexp (a [%sp x] e)]
+
+which evaluates to
+
+    `List [`Symbol "a"; `Symbol "b"; `Symbol "c"; `Symbol "d"; `Symbol "e"]
+
+If you instead have a list of S-expressions, you can splice it using the `[%spls ...]` syntax.
+
 # Why is this useful?
 
 Well, Scheme has a very cool set of specifications and tooling called [SXML](https://en.wikipedia.org/wiki/SXML) that lets you write XML documents using S-expressions.
@@ -62,7 +73,7 @@ This is very ugly.
 With the ppx_sexp syntax extension, we can regain much of the expressiveness of S-expressions and quasiquotations inside of OCaml:
 
     [%sexp
-       (html (+ (lang "en"))
+       (html ((@) (lang "en"))
           (head
              (title "Hi there!"))
           (body
@@ -94,6 +105,8 @@ Third, `(/ a 2)` will trigger an unmatched parentheses syntax error.
 These are pretty ponderous restrictions if the goal is to embed Scheme code in OCaml.
 However, my goal in writing this extension was allow for SXML-like expressions.
 HTML documents do not often include `let` or `/` tags, so ppx_sexp works well enough for this use-case.
+
+Note that you should also watch out for OCaml's operator precedence and associativity rules.
 
 # Installation
 

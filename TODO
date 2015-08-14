@@ -1,3 +1,2 @@
 - Pattern matching of S-expressions
 - Consider including string_of_sexp, string_of_atom, etc. from sxmlm
-- Come up with a way to implement unquote-splicing (tricky)

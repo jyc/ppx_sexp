@@ -16,7 +16,8 @@ type sexp = [
   | `List of sexp list
 
   (* These last two types are not present in generated code. *)
-  | `Expr of string * Parsetree.structure
+  | `Expr of string * Parsetree.expression
+  | `Splice of Parsetree.expression * [`Alias | `Raw]
   | `Error of Location.t * string
 ]
 
@@ -125,17 +126,17 @@ and quote ?fudge ({ pexp_desc; pexp_loc } as x) =
     end
   | Pexp_variant (l, x') ->
     begin match x' with
-    | Some x ->
-      `List [`String l; quote' x]
-    | None ->
-      `String l
+      | Some x ->
+        `List [`String l; quote' x]
+      | None ->
+        `String l
     end
   (* Turn records into alists. *)
   | Pexp_record (sets, from) ->
     begin match from with
-    | Some _ -> `Error (pexp_loc, "Records creations using 'with' cannot be quoted.")
-    | None ->
-      `List (List.map (fun ({ txt = id }, x) -> `List [quote_id ?fudge id; quote' x]) sets)
+      | Some _ -> `Error (pexp_loc, "Records creations using 'with' cannot be quoted.")
+      | None ->
+        `List (List.map (fun ({ txt = id }, x) -> `List [quote_id ?fudge id; quote' x]) sets)
     end
   | Pexp_field (x, { txt = id }) ->
     begin match quote' x with
@@ -147,10 +148,14 @@ and quote ?fudge ({ pexp_desc; pexp_loc } as x) =
     `List (List.map quote' xs)
   (* We could support these, but it's not clear whether users would use these for their s-expressions. *)
   | Pexp_sequence _ -> failwith "Sequenced expressions cannot be quoted."
-  | Pexp_extension ({ txt }, PStr ss) when txt = "in" || is_alias txt ->
+  | Pexp_extension ({ txt }, PStr ss) when txt = "in" || txt = "sp" || txt = "spls" || is_alias txt ->
     begin match ss with
       | { pstr_desc = Pstr_eval (x, _) } :: [] ->
-        `Expr (txt, x)
+        begin match txt with
+          | "sp" -> `Splice (x, `Raw)
+          | "spls" -> `Splice (x, `Alias)
+          | _ -> `Expr (txt, x)
+        end
       | _ -> `Error (pexp_loc, "Invalid body of insertion: must only contain one structure element.")
     end
   (* We could try to quote these, e.g. let x = 5, but the client would still be
@@ -174,6 +179,50 @@ let rec encode mapper s =
                                   pexp_loc = Location.none;
                                   pexp_attributes = [] })) in
   let const v c = encode' v (Pexp_constant c) in
+  let extract_splice xs =
+    let rec extract_splice' xs pre =
+      match xs with
+      | `Splice x :: tl ->
+        Some (x, List.rev pre, tl)
+      | hd :: tl ->
+        extract_splice' tl (hd :: pre)
+      | [] ->
+        None
+    in extract_splice' xs []
+  in
+  let nil = constr "[]" in
+  let cons a b =
+    constr "::" ~args:{ pexp_desc = Pexp_tuple [a; b];
+                        pexp_loc = Location.none;
+                        pexp_attributes = [] } in
+  let ls xs = List.fold_right cons xs nil in
+  (* [dels x] returns a Parsetree.expression that evaluates to the list contained in the `List x. *)
+  let dels x =
+    { pexp_desc =
+        Pexp_let (Nonrecursive,
+                  [{ pvb_pat =
+                       { ppat_desc =
+                           Ppat_variant ("List",
+                                         Some { ppat_desc =
+                                                  Ppat_var { txt = "x";
+                                                             loc = Location.none};
+                                                ppat_loc = Location.none;
+                                                ppat_attributes = []
+                                              }); 
+                         ppat_loc = Location.none;
+                         ppat_attributes = [] };
+                     pvb_expr = x;
+                     pvb_attributes = [];
+                     pvb_loc = Location.none }],
+                  { pexp_desc = Pexp_ident { txt = Longident.Lident "x"; loc = Location.none };
+                    pexp_loc = Location.none;
+                    pexp_attributes = [] }
+                 );
+      pexp_loc = Location.none;
+      pexp_attributes = []
+    } in
+  let remap = mapper.expr mapper in
+
   match s with
   | `Char x ->
     const "Char" (Const_char x)
@@ -196,15 +245,26 @@ let rec encode mapper s =
   | `Bool false ->
     constr "false"
   | `List xs ->
-    let nil = constr "[]" in
-    let cons a b =
-      constr "::" ~args:{ pexp_desc = Pexp_tuple [a; b];
-                          pexp_loc = Location.none;
-                          pexp_attributes = [] } in
-    expr (Pexp_variant ("List", Some (List.fold_right cons (List.map (encode mapper) xs) nil)))
-  | `Expr ("in", x) -> (mapper.expr mapper x)
+    begin match extract_splice xs with
+    | Some ((x, raw), pre, post) ->
+      encode' "List" (Pexp_apply ({ pexp_desc = Pexp_ident { txt = Longident.Ldot (Longident.Lident "List", "concat");
+                                                             loc = Location.none };
+                                    pexp_loc = Location.none;
+                                    pexp_attributes = []},
+                                  [("", ls [ls (List.map (encode mapper) pre); 
+                                            (match raw with
+                                              | `Raw -> dels (remap x)
+                                              | `Alias -> (remap x));
+                                            (* We put it into a `List so we can recurse and handle recursive splices. *)
+                                            dels (encode mapper (`List post))])]))
+    | None ->
+      expr (Pexp_variant ("List", Some (ls (List.map (encode mapper) xs))))
+    end
+  | `Splice _ ->
+    failwith "Internal error: encountered bare splice."
+  | `Expr ("in", x) -> (remap x)
   | `Expr (alias, x) ->
-    expr (Pexp_variant (atom_constr_of_alias alias, Some (mapper.expr mapper x)))
+    expr (Pexp_variant (atom_constr_of_alias alias, Some (remap x)))
   | `Error (loc, msg) -> error loc msg
 
 let sexp_mapper argv =
