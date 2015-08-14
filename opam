@@ -6,7 +6,7 @@ authors: "Jonathan Chan <jyc@fastmail.fm>"
 homepage: "https://bitbucket.org/jyc/ppx_sexp"
 bug-reports: "https://bitbucket.org/jyc/ppx_sexp/issues"
 license: "BSD 2-Clause"
-dev-repo: "https://bitbucket.org/jyc/ppx_sexp/src"
+dev-repo: "https://bitbucket.org/jyc/ppx_sexp"
 build: [
   ["./build"]
 ]
